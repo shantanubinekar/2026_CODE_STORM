@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BridgePulse | Structural Health Monitoring Dashboard</title>
+  <meta name="description" content="BridgePulse — Real-time mathematical structural health monitoring prototype for Rajiv Gandhi Sea Link."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --good: #16a34a;
+      --good-light: #f0fdf4;
+      --good-border: #bbf7d0;
+      --warning: #f59e0b;
+      --warning-light: #fffbeb;
+      --warning-border: #fde68a;
+      --critical: #dc2626;
+      --critical-light: #fef2f2;
+      --critical-border: #fecaca;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --light-muted: #9ca3af;
+      --border: #e5e7eb;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 36px;
+      overflow-x: hidden;
+    }
+
+    /* HEADER */
+    #navbar {
+      position: sticky; top: 0; z-index: 200; height: 60px;
+      background: var(--card); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-logo {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--primary-light); color: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; font-weight: 800;
+    }
+    .brand-title { font-size: 1.15rem; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+    .brand-subtitle { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+    .header-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+    .nav-right { display: flex; align-items: center; gap: 16px; font-size: 0.85rem; }
+    .live-chip {
+      display: flex; align-items: center; gap: 6px; padding: 4px 12px;
+      border-radius: 20px; background: var(--good-light); border: 1px solid var(--good-border);
+      color: var(--good); font-size: 0.75rem; font-weight: 700;
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--good);
+      animation: pulse-live 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .dt-text { font-weight: 500; color: var(--muted); }
+
+    /* CONTROLS BAR */
+    .controls-bar {
+      max-width: 1600px; margin: 16px auto 0; padding: 0 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .btn-group { display: flex; gap: 10px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: var(--radius-md);
+      font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); transition: all 0.2s ease;
+    }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #fff; color: var(--text); }
+    .btn-secondary:hover { background: var(--bg); }
+    .sim-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fef3c7; border: 1px solid #fde68a; color: #b45309;
+      padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* ALERT BANNER */
+    .alert-banner {
+      max-width: 1600px; margin: 12px auto 0; padding: 0 16px; display: none;
+    }
+    .banner-content {
+      border-radius: var(--radius-md); padding: 14px 20px;
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .banner-content.critical { background: var(--critical-light); border: 1px solid var(--critical-border); border-left: 5px solid var(--critical); }
+    .banner-content.warning { background: var(--warning-light); border: 1px solid var(--warning-border); border-left: 5px solid var(--warning); }
+    .banner-icon { font-size: 1.4rem; }
+    .banner-content.critical .banner-icon { color: var(--critical); }
+    .banner-content.warning .banner-icon { color: var(--warning); }
+    .banner-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 2px; }
+    .banner-content.critical .banner-title { color: var(--critical); }
+    .banner-content.warning .banner-title { color: #b45309; }
+    .banner-desc { font-size: 0.84rem; color: #4b5563; line-height: 1.5; }
+
+    /* LAYOUT GRID */
+    #page { max-width: 1600px; margin: 16px auto 0; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+
+    .top-row { display: grid; grid-template-columns: 1.8fr 1fr 1fr; gap: 16px; }
+    .bot-row { display: grid; grid-template-columns: 0.75fr 1fr 1.25fr; gap: 16px; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; }
+
+    /* HERO BRIDGE CARD */
+    .hero-card { position: relative; display: flex; flex-direction: column; min-height: 340px; }
+    .hero-img-wrap { position: relative; flex: 1; width: 100%; height: 100%; overflow: hidden; background: #1e293b; }
+    .hero-img-wrap img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+    .hero-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 20px 24px;
+      background: linear-gradient(transparent 0%, rgba(15, 23, 42, 0.75) 100%);
+      color: #fff;
+    }
+    .hero-title { font-size: 1.6rem; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-bottom: 4px; }
+    .hero-sub { font-size: 0.85rem; opacity: 0.9; font-weight: 500; }
+    .hero-tag {
+      position: absolute; top: 16px; left: 16px;
+      background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px);
+      padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+      color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 6px;
+    }
+    .hero-tag-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+
+    /* KPI METRICS STACK */
+    .kpi-stack { display: flex; flex-direction: column; gap: 10px; }
+    .kpi-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md);
+      padding: 14px 18px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px; flex: 1;
+    }
+    .kpi-icon {
+      width: 42px; height: 42px; border-radius: 10px; background: var(--primary-light);
+      color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+    }
+    .kpi-body { flex: 1; min-width: 0; }
+    .kpi-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: var(--text); font-family: 'JetBrains Mono', monospace; line-height: 1.1; }
+    .kpi-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .kpi-dot.good { background: var(--good); }
+    .kpi-dot.warning { background: var(--warning); }
+    .kpi-dot.critical { background: var(--critical); }
+
+    /* ALERTS CARD */
+    .alerts-card { padding: 18px 20px; display: flex; flex-direction: column; height: 100%; }
+    .card-heading { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+    .alerts-list { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
+    .alert-item {
+      padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.82rem;
+      display: flex; align-items: center; gap: 10px; border: 1px solid var(--border);
+    }
+    .alert-item.good { background: var(--good-light); border-color: var(--good-border); }
+    .alert-item.warning { background: var(--warning-light); border-color: var(--warning-border); }
+    .alert-item.critical { background: var(--critical-light); border-color: var(--critical-border); }
+    .alert-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .alert-item.good .alert-item-dot { background: var(--good); }
+    .alert-item.warning .alert-item-dot { background: var(--warning); }
+    .alert-item.critical .alert-item-dot { background: var(--critical); }
+    .alert-item-text { flex: 1; font-weight: 600; color: var(--text); }
+    .alert-item-time { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+
+    /* HEALTH SCORE CARD */
+    .health-card { padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .ring-wrap { position: relative; width: 130px; height: 130px; margin: 12px 0; }
+    .ring-wrap canvas { width: 130px; height: 130px; }
+    .ring-center {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+    }
+    .ring-pct { font-size: 1.9rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .ring-sub { font-size: 0.65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .health-status-tag {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px;
+      border-radius: 20px; font-weight: 700; font-size: 0.85rem; margin-top: 6px;
+    }
+    .health-status-tag.good { background: var(--good-light); color: var(--good); border: 1px solid var(--good-border); }
+    .health-status-tag.warning { background: var(--warning-light); color: #b45309; border: 1px solid var(--warning-border); }
+    .health-status-tag.critical { background: var(--critical-light); color: var(--critical); border: 1px solid var(--critical-border); }
+
+    /* CHART CARDS */
+    .chart-card { padding: 18px 20px; display: flex; flex-direction: column; }
+    .chart-box { position: relative; flex: 1; min-height: 220px; width: 100%; margin-top: 8px; }
+
+    /* MATH ENGINE PANEL */
+    .math-card { padding: 20px 24px; margin-bottom: 16px; }
+    .math-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 12px; }
+    .math-box {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-md);
+      padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: #334155; line-height: 1.7;
+    }
+    .math-box-title {
+      font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+    }
+    .m-val { color: #0f172a; font-weight: 600; }
+    .m-good { color: var(--good); font-weight: 700; }
+    .m-warning { color: var(--warning); font-weight: 700; }
+    .m-critical { color: var(--critical); font-weight: 700; }
+    .m-blue { color: var(--primary); font-weight: 700; }
+
+    /* FOOTER */
+    .footer { text-align: center; color: var(--light-muted); font-size: 0.78rem; padding: 12px 0; }
+
+    @media (max-width: 1100px) {
+      .top-row { grid-template-columns: 1fr; }
+      .bot-row { grid-template-columns: 1fr; }
+      .math-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .math-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav id="navbar">
+    <div class="brand">
+      <div class="brand-logo"><i class="fa-solid fa-bridge"></i></div>
+      <div>
+        <div class="brand-title">BridgePulse</div>
+        <div class="brand-subtitle">Mathematical Structural Health Monitoring Prototype</div>
+      </div>
+    </div>
+    <div class="header-sep"></div>
+    <div class="nav-right">
+      <div class="dt-text" id="liveClock">--:--:--</div>
+      <div class="live-chip"><div class="live-dot"></div>LIVE STREAM</div>
+    </div>
+  </nav>
+
+  <!-- CONTROLS BAR -->
+  <div class="controls-bar">
+    <div class="btn-group" style="flex-wrap: wrap;">
+      <button class="btn btn-primary" id="injectBtn"><i class="fa-solid fa-burst"></i> 💥 Sudden Major Crack</button>
+      <button class="btn btn-secondary" id="crackBtn"><i class="fa-solid fa-crutch"></i> 🤏 Micro Crack Drift</button>
+      <button class="btn btn-secondary" id="loadBtn"><i class="fa-solid fa-truck-moving"></i> 🚛 Heavy Traffic Load</button>
+      <button class="btn btn-secondary" id="stormBtn"><i class="fa-solid fa-cloud-showers-heavy"></i> ⛈️ Severe Storm</button>
+      <button class="btn btn-secondary" id="resetBtn"><i class="fa-solid fa-rotate-left"></i> 🔄 Reset Normal</button>
+    </div>
+    <div class="sim-tag"><i class="fa-solid fa-flask"></i> SIMULATED SENSOR DATA</div>
+  </div>
+
+  <!-- DYNAMIC ALERT BANNER -->
+  <div class="alert-banner" id="alertBanner">
+    <div class="banner-content" id="bannerContent">
+      <div class="banner-icon" id="bannerIcon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div>
+        <div class="banner-title" id="bannerTitle">STRUCTURAL DEVIATION DETECTED</div>
+        <div class="banner-desc" id="bannerDesc">Observed behaviour exceeds the configured threshold. Recommended action: initiate structural inspection.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE CONTENT -->
+  <div id="page">
+
+    <!-- TOP ROW -->
+    <div class="top-row">
+      <!-- HERO BRIDGE CARD -->
+      <div class="card hero-card">
+        <div class="hero-tag"><div class="hero-tag-dot" id="heroDot"></div><span id="heroStatusText">NORMAL OPERATION</span></div>
+        <div class="hero-img-wrap">
+          <img src="bridge.jpg" alt="Rajiv Gandhi Sea Link"/>
+          <div class="hero-overlay">
+            <div class="hero-title">Rajiv Gandhi Sea Link</div>
+            <div class="hero-sub">Cable-stayed structural health monitoring • Structure ID: RGSL-MUM-001</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI METRICS STACK -->
+      <div class="kpi-stack">
+        <div class="kpi-card">
+          <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
+          <div class="kpi-body">
+            <div class="kpi-label">Residual</div>
+            <div class="kpi-value" id="kpiResidual">0.018</div>
+          </div>
+          <div class="kpi-dot good" id="dotResidual"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i class="fa-solid fa-brain"></i></div>
+          <div class="kpi-body">
+            <div class="kpi-label">Dominant Eigenvalue</div>
+            <div class="kpi-value" id="kpiEigenvalue">0.93</div>
+          </div>
+          <div class="kpi-dot good" id="dotEigenvalue"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i class="fa-solid fa-microchip"></i></div>
+          <div class="kpi-body">
+            <div class="kpi-label">Sensors Active</div>
+            <div class="kpi-value" id="kpiSensors">64 / 64</div>
+          </div>
+          <div class="kpi-dot good" id="dotSensors"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+          <div class="kpi-body">
+            <div class="kpi-label">Predicted Useful Life</div>
+            <div class="kpi-value" id="kpiUsefulLife">18.2 years</div>
+          </div>
+          <div class="kpi-dot good" id="dotUsefulLife"></div>
+        </div>
+      </div>
+
+      <!-- RECENT ALERTS -->
+      <div class="card alerts-card">
+        <div class="card-heading">
+          <span><i class="fa-solid fa-bell" style="color:var(--primary); margin-right:6px;"></i>Recent Alerts</span>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:500;">Live Feed</span>
+        </div>
+        <div class="alerts-list" id="alertsList">
+          <!-- Dynamic alert rows -->
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="bot-row">
+      <!-- HEALTH SCORE DONUT CARD -->
+      <div class="card health-card">
+        <div class="card-heading" style="width:100%;">Bridge Health Index</div>
+        <div class="ring-wrap">
+          <canvas id="healthRingCanvas" width="130" height="130"></canvas>
+          <div class="ring-center">
+            <div class="ring-pct" id="ringPct">100%</div>
+            <div class="ring-sub" id="ringSub">EXCELLENT</div>
+          </div>
+        </div>
+        <div class="health-status-tag good" id="healthStatusTag">
+          <i class="fa-solid fa-circle" style="font-size:0.6rem;"></i> <span id="healthStatusText">NORMAL</span>
+        </div>
+      </div>
+
+      <!-- RESIDUAL VS TIME CHART -->
+      <div class="card chart-card">
+        <div class="card-heading">
+          <span><i class="fa-solid fa-chart-area" style="color:var(--primary); margin-right:6px;"></i>Residual Magnitude (Dₖ = ‖rₖ‖₂)</span>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:500;">Threshold Line (τ₁=3.0)</span>
+        </div>
+        <div class="chart-box">
+          <canvas id="residualChartJS"></canvas>
+        </div>
+      </div>
+
+      <!-- LIVE SENSOR READINGS CHART -->
+      <div class="card chart-card">
+        <div class="card-heading">
+          <span><i class="fa-solid fa-wave-square" style="color:#7c3aed; margin-right:6px;"></i>Observed vs Expected Behaviour</span>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:500;">Strain & Vibration</span>
+        </div>
+        <div class="chart-box">
+          <canvas id="sensorChartJS"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATHEMATICAL ENGINE PANEL -->
+    <div class="card math-card">
+      <div class="card-heading">🧮 Mathematical Engine — Live State-Space Pipeline</div>
+      <div class="math-grid">
+        <div class="math-box">
+          <div class="math-box-title">Observed State (xₖ)</div>
+          <div class="m-val" id="mObsStrain">[ 100.000 ] strain</div>
+          <div class="m-val" id="mObsVib">[ 0.000 ] vibration</div>
+          <div class="m-val" id="mObsTilt">[ 0.000 ] tilt</div>
+          <div class="m-val" id="mObsTemp">[ 20.000 ] temp</div>
+        </div>
+        <div class="math-box">
+          <div class="math-box-title">Expected State (x̂ₖ)</div>
+          <div class="m-val" id="mExpStrain">[ 100.000 ]</div>
+          <div class="m-val" id="mExpVib">[ 0.000 ]</div>
+          <div class="m-val" id="mExpTilt">[ 0.000 ]</div>
+          <div class="m-val" id="mExpTemp">[ 20.000 ]</div>
+        </div>
+        <div class="math-box">
+          <div class="math-box-title">Residual (rₖ = xₖ − x̂ₖ)</div>
+          <div class="m-val" id="mResStrain">[ +0.000 ]</div>
+          <div class="m-val" id="mResVib">[ +0.000 ]</div>
+          <div class="m-val" id="mResTilt">[ +0.000 ]</div>
+          <div class="m-val" id="mResTemp">[ +0.000 ]</div>
+        </div>
+        <div class="math-box">
+          <div class="math-box-title">Threshold Classification</div>
+          <div class="m-val">Dₖ = ‖rₖ‖₂ = <span class="m-blue" id="mDk">0.000</span></div>
+          <div style="margin: 4px 0;" id="mRule"><span class="m-good">Dₖ &lt; τ₁ = 3.000</span></div>
+          <div class="m-good" id="mStatus" style="font-size: 1.05rem; margin-top: 4px;">→ NORMAL</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    ⚡ SIMULATED SENSOR DATA — Mathematical Structural Health Monitoring Prototype • BridgePulse Phase 1
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------------------
+    // MATH ENGINE & SIMULATION LOGIC
+    // ---------------------------------------------------------------------------
+    const WARNING_THRESHOLD = 3.0;
+    const CRITICAL_THRESHOLD = 10.0;
+    const BASELINES = { strain: 100.0, vibration: 0.0, tilt: 0.0, temperature: 20.0 };
+
+    const state = {
+      timeStep: 0,
+      simMode: "normal", // "normal", "critical", "crack", "load", "storm"
+      crackProgress: 0.0,
+      prevReading: [BASELINES.strain, BASELINES.vibration, BASELINES.tilt, BASELINES.temperature],
+      history: [],
+      alerts: []
+    };
+
+    function pseudoNoise(step, amp) {
+      return Math.sin(step / 3.8 + 0.4) * amp + Math.cos(step / 7.2 + 1.1) * (amp * 0.45);
+    }
+
+    function getSensorReadings(step) {
+      const strain = BASELINES.strain + pseudoNoise(step, 0.4);
+      const vibration = BASELINES.vibration + 0.15 * Math.sin(step / 5.0) + pseudoNoise(step + 3, 0.08);
+      const tilt = BASELINES.tilt + 0.005 * Math.sin(step / 80.0) + pseudoNoise(step + 8, 0.003);
+      const temp = BASELINES.temperature + 5.0 * Math.sin(step / 50.0) + pseudoNoise(step + 5, 0.08);
+      return [strain, vibration, tilt, temp];
+    }
+
+    function applyScenario(reading) {
+      if (state.simMode === "critical") {
+        return [reading[0] + 15.0, reading[1] + 3.0, reading[2] + 0.5, reading[3] + 2.0];
+      } else if (state.simMode === "crack") {
+        state.crackProgress += 0.2;
+        const drift = Math.min(6.5, 3.2 + state.crackProgress * 0.12);
+        return [reading[0] + drift, reading[1] + 0.6, reading[2] + 0.08, reading[3] + 0.3];
+      } else if (state.simMode === "load") {
+        return [reading[0] + 5.8, reading[1] + 1.2, reading[2] + 0.04, reading[3] + 0.2];
+      } else if (state.simMode === "storm") {
+        return [reading[0] + 2.2, reading[1] + 2.5, reading[2] + 0.18, reading[3] + 4.5];
+      }
+      return reading;
+    }
+
+    function calculateExpectedState(healthyReading) {
+      return [
+        healthyReading[0],
+        0.95 * healthyReading[1],
+        0.98 * healthyReading[2],
+        healthyReading[3]
+      ];
+    }
+
+    function computeResidual(obs, exp) {
+      return obs.map((v, i) => v - exp[i]);
+    }
+
+    function computeResidualMagnitude(res) {
+      return Math.sqrt(res.reduce((sum, v) => sum + v * v, 0));
+    }
+
+    function classifyHealth(magnitude) {
+      if (magnitude < WARNING_THRESHOLD) return "NORMAL";
+      if (magnitude < CRITICAL_THRESHOLD) return "WARNING";
+      return "CRITICAL";
+    }
+
+    function runPipeline(obs, healthyBase) {
+      const exp = calculateExpectedState(healthyBase);
+      const res = computeResidual(obs, exp);
+      const dk = computeResidualMagnitude(res);
+      const status = classifyHealth(dk);
+      return { obs, exp, res, dk, status };
+    }
+
+    // ---------------------------------------------------------------------------
+    // CHART.JS INITIALIZATION (PROPER & BEAUTIFUL GRAPHS)
+    // ---------------------------------------------------------------------------
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = "#6b7280";
+
+    // 1. Residual Chart
+    const ctxRes = document.getElementById("residualChartJS").getContext("2d");
+    const gradientRes = ctxRes.createLinearGradient(0, 0, 0, 200);
+    gradientRes.addColorStop(0, "rgba(37, 99, 235, 0.25)");
+    gradientRes.addColorStop(1, "rgba(37, 99, 235, 0.0)");
+
+    const residualChart = new Chart(ctxRes, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Residual Magnitude Dₖ",
+            data: [],
+            borderColor: "#2563eb",
+            borderWidth: 2.5,
+            backgroundColor: gradientRes,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: "#2563eb"
+          },
+          {
+            label: "Warning Threshold (3.0)",
+            data: [],
+            borderColor: "#f59e0b",
+            borderWidth: 1.8,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: "Critical Threshold (10.0)",
+            data: [],
+            borderColor: "#dc2626",
+            borderWidth: 1.8,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 300 },
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            align: "end",
+            labels: { boxWidth: 12, font: { size: 11, weight: "600" } }
+          },
+          tooltip: {
+            backgroundColor: "#1e293b",
+            titleFont: { size: 12, weight: "700" },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 8
+          }
+        },
+        scales: {
+          x: { grid: { color: "#f1f5f9" }, ticks: { maxRotation: 0, font: { size: 10 } } },
+          y: { grid: { color: "#f1f5f9" }, min: 0, suggestedMax: 12, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+
+    // 2. Observed vs Expected Chart
+    const ctxSensor = document.getElementById("sensorChartJS").getContext("2d");
+    const sensorChart = new Chart(ctxSensor, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Observed Strain (µε)",
+            data: [],
+            borderColor: "#2563eb",
+            borderWidth: 2.2,
+            tension: 0.4,
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: "Expected Strain (µε)",
+            data: [],
+            borderColor: "#60a5fa",
+            borderWidth: 2.0,
+            borderDash: [5, 4],
+            tension: 0.4,
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: "Observed Vibration (m/s²)",
+            data: [],
+            borderColor: "#7c3aed",
+            borderWidth: 2.2,
+            tension: 0.4,
+            pointRadius: 0,
+            fill: false,
+            yAxisID: "yVib"
+          },
+          {
+            label: "Expected Vibration (m/s²)",
+            data: [],
+            borderColor: "#c084fc",
+            borderWidth: 2.0,
+            borderDash: [5, 4],
+            tension: 0.4,
+            pointRadius: 0,
+            fill: false,
+            yAxisID: "yVib"
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 300 },
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            align: "end",
+            labels: { boxWidth: 12, font: { size: 10, weight: "600" } }
+          },
+          tooltip: {
+            backgroundColor: "#1e293b",
+            padding: 10,
+            cornerRadius: 8
+          }
+        },
+        scales: {
+          x: { grid: { color: "#f1f5f9" }, ticks: { maxRotation: 0, font: { size: 10 } } },
+          y: { type: "linear", position: "left", grid: { color: "#f1f5f9" }, title: { display: true, text: "Strain (µε)", font: { size: 10 } } },
+          yVib: { type: "linear", position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "Vibration (m/s²)", font: { size: 10 } } }
+        }
+      }
+    });
+
+    // ---------------------------------------------------------------------------
+    // HEALTH RING CANVAS
+    // ---------------------------------------------------------------------------
+    function drawHealthRing(pct, status) {
+      const cvs = document.getElementById("healthRingCanvas");
+      const ctx = cvs.getContext("2d");
+      const w = cvs.width, h = cvs.height, r = 50;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.beginPath();
+      ctx.arc(w/2, h/2, r, 0, Math.PI * 2);
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.stroke();
+
+      const color = status === "CRITICAL" ? "#dc2626" : (status === "WARNING" ? "#f59e0b" : "#16a34a");
+      const rad = (pct / 100) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(w/2, h/2, r, -Math.PI / 2, -Math.PI / 2 + rad);
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = color;
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+
+    // ---------------------------------------------------------------------------
+    // UI UPDATES
+    // ---------------------------------------------------------------------------
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("liveClock").textContent = now.toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function updateAlertsList(status) {
+      const list = document.getElementById("alertsList");
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      if (status === "CRITICAL" && (!state.alerts[0] || state.alerts[0].type !== "critical")) {
+        state.alerts.unshift({ type: "critical", title: "Structural Anomaly Injected", time: timeStr });
+      } else if (status === "WARNING" && (!state.alerts[0] || state.alerts[0].type !== "warning")) {
+        state.alerts.unshift({ type: "warning", title: "Elevated Structural Deviation", time: timeStr });
+      } else if (state.alerts.length === 0) {
+        state.alerts = [
+          { type: "good", title: "Normal Monitoring Nominal", time: timeStr },
+          { type: "good", title: "All 4 Channels Online", time: "5m ago" },
+          { type: "good", title: "SCADA Subsystem Ready", time: "12m ago" }
+        ];
+      }
+      
+      list.innerHTML = state.alerts.slice(0, 4).map(item => `
+        <div class="alert-item ${item.type}">
+          <div class="alert-item-dot"></div>
+          <div class="alert-item-text">${item.title}</div>
+          <div class="alert-item-time">${item.time}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderUI(res) {
+      const dk = res.dk;
+      const status = res.status;
+      const health = Math.max(0, Math.min(100, 100 - (dk / CRITICAL_THRESHOLD) * 100));
+
+      // KPI & Status text
+      document.getElementById("kpiResidual").textContent = dk.toFixed(3);
+      document.getElementById("kpiEigenvalue").textContent = status === "NORMAL" ? "0.93" : (status === "WARNING" ? "0.78" : "0.52");
+      document.getElementById("kpiSensors").textContent = status === "CRITICAL" ? "61 / 64" : "64 / 64";
+      document.getElementById("kpiUsefulLife").textContent = status === "NORMAL" ? "18.2 years" : (status === "WARNING" ? "12.5 years" : "5.1 years");
+
+      const statusDotClass = status === "CRITICAL" ? "critical" : (status === "WARNING" ? "warning" : "good");
+      document.getElementById("dotResidual").className = `kpi-dot ${statusDotClass}`;
+      document.getElementById("dotEigenvalue").className = `kpi-dot ${status === "NORMAL" ? "good" : (status === "WARNING" ? "warning" : "critical")}`;
+      document.getElementById("dotSensors").className = `kpi-dot ${statusDotClass}`;
+      document.getElementById("dotUsefulLife").className = `kpi-dot ${statusDotClass}`;
+      document.getElementById("heroDot").className = `hero-tag-dot ${statusDotClass}`;
+      document.getElementById("heroStatusText").textContent = status === "NORMAL" ? "NORMAL OPERATION" : `${status} ALERT`;
+
+      // Alert Banner
+      const banner = document.getElementById("alertBanner");
+      const bannerContent = document.getElementById("bannerContent");
+      const bannerTitle = document.getElementById("bannerTitle");
+      const bannerDesc = document.getElementById("bannerDesc");
+
+      if (status === "CRITICAL") {
+        banner.style.display = "block";
+        bannerContent.className = "banner-content critical";
+        bannerTitle.textContent = "🚨 CRITICAL STRUCTURAL DEVIATION DETECTED";
+        bannerDesc.textContent = `Major structural failure risk (Dₖ = ${dk.toFixed(3)} > τ₂ = ${CRITICAL_THRESHOLD}). Recommended action: initiate immediate structural inspection.`;
+      } else if (status === "WARNING") {
+        banner.style.display = "block";
+        bannerContent.className = "banner-content warning";
+        if (state.simMode === "crack") {
+          bannerTitle.textContent = "⚠️ MICRO-CRACK FATIGUE DRIFT DETECTED";
+          bannerDesc.textContent = `Slow structural crack accumulation (Dₖ = ${dk.toFixed(3)} > τ₁ = ${WARNING_THRESHOLD}). Recommended action: schedule early maintenance inspection.`;
+        } else if (state.simMode === "load") {
+          bannerTitle.textContent = "⚠️ HEAVY VEHICLE TRAFFIC LOAD";
+          bannerDesc.textContent = `High vehicular payload flex (Dₖ = ${dk.toFixed(3)} > τ₁ = ${WARNING_THRESHOLD}). Active traffic control monitoring.`;
+        } else if (state.simMode === "storm") {
+          bannerTitle.textContent = "⚠️ SEVERE STORM WIND STRESS";
+          bannerDesc.textContent = `Aerodynamic oscillation & thermal expansion (Dₖ = ${dk.toFixed(3)} > τ₁ = ${WARNING_THRESHOLD}). Structural dampers engaged.`;
+        } else {
+          bannerTitle.textContent = "⚠️ ELEVATED STRUCTURAL DEVIATION";
+          bannerDesc.textContent = `Residual magnitude above warning level (Dₖ = ${dk.toFixed(3)} > τ₁ = ${WARNING_THRESHOLD}). Recommended action: increase monitoring frequency.`;
+        }
+      } else {
+        banner.style.display = "none";
+      }
+
+      // Health ring & tag
+      document.getElementById("ringPct").textContent = `${Math.round(health)}%`;
+      document.getElementById("ringSub").textContent = health > 70 ? "EXCELLENT" : (health > 40 ? "WARNING" : "CRITICAL");
+      const tag = document.getElementById("healthStatusTag");
+      tag.className = `health-status-tag ${statusDotClass}`;
+      document.getElementById("healthStatusText").textContent = status;
+
+      drawHealthRing(health, status);
+
+      // Math Engine Panel
+      document.getElementById("mObsStrain").textContent = `[ ${res.obs[0].toFixed(3)} ] strain`;
+      document.getElementById("mObsVib").textContent = `[ ${res.obs[1].toFixed(3)} ] vibration`;
+      document.getElementById("mObsTilt").textContent = `[ ${res.obs[2].toFixed(4)} ] tilt`;
+      document.getElementById("mObsTemp").textContent = `[ ${res.obs[3].toFixed(3)} ] temp`;
+
+      document.getElementById("mExpStrain").textContent = `[ ${res.exp[0].toFixed(3)} ]`;
+      document.getElementById("mExpVib").textContent = `[ ${res.exp[1].toFixed(3)} ]`;
+      document.getElementById("mExpTilt").textContent = `[ ${res.exp[2].toFixed(4)} ]`;
+      document.getElementById("mExpTemp").textContent = `[ ${res.exp[3].toFixed(3)} ]`;
+
+      document.getElementById("mResStrain").textContent = `[ ${res.res[0] >= 0 ? '+' : ''}${res.res[0].toFixed(3)} ]`;
+      document.getElementById("mResVib").textContent = `[ ${res.res[1] >= 0 ? '+' : ''}${res.res[1].toFixed(3)} ]`;
+      document.getElementById("mResTilt").textContent = `[ ${res.res[2] >= 0 ? '+' : ''}${res.res[2].toFixed(4)} ]`;
+      document.getElementById("mResTemp").textContent = `[ ${res.res[3] >= 0 ? '+' : ''}${res.res[3].toFixed(3)} ]`;
+
+      document.getElementById("mDk").textContent = dk.toFixed(4);
+      const rule = document.getElementById("mRule");
+      const stEl = document.getElementById("mStatus");
+      if (status === "CRITICAL") {
+        rule.innerHTML = `<span class="m-critical">Dₖ ≥ τ₂ = ${CRITICAL_THRESHOLD.toFixed(3)}</span>`;
+        stEl.className = "m-critical";
+        stEl.textContent = "→ CRITICAL ALERT";
+      } else if (status === "WARNING") {
+        rule.innerHTML = `<span class="m-warning">τ₁ = ${WARNING_THRESHOLD.toFixed(3)} ≤ Dₖ < τ₂</span>`;
+        stEl.className = "m-warning";
+        stEl.textContent = "→ WARNING";
+      } else {
+        rule.innerHTML = `<span class="m-good">Dₖ < τ₁ = ${WARNING_THRESHOLD.toFixed(3)}</span>`;
+        stEl.className = "m-good";
+        stEl.textContent = "→ NORMAL";
+      }
+
+      updateAlertsList(status);
+
+      // ---------------------------------------------------------------------------
+      // UPDATE CHART.JS GRAPHS
+      // ---------------------------------------------------------------------------
+      const labels = state.history.map(item => item.timeStr);
+      const residualValues = state.history.map(item => item.dk);
+      const warnThresholdData = state.history.map(() => WARNING_THRESHOLD);
+      const critThresholdData = state.history.map(() => CRITICAL_THRESHOLD);
+
+      residualChart.data.labels = labels;
+      residualChart.data.datasets[0].data = residualValues;
+      residualChart.data.datasets[1].data = warnThresholdData;
+      residualChart.data.datasets[2].data = critThresholdData;
+      residualChart.update("none");
+
+      sensorChart.data.labels = labels;
+      sensorChart.data.datasets[0].data = state.history.map(item => item.obs[0]);
+      sensorChart.data.datasets[1].data = state.history.map(item => item.exp[0]);
+      sensorChart.data.datasets[2].data = state.history.map(item => item.obs[1]);
+      sensorChart.data.datasets[3].data = state.history.map(item => item.exp[1]);
+      sensorChart.update("none");
+    }
+
+    // ---------------------------------------------------------------------------
+    // ENGINE TICK
+    // ---------------------------------------------------------------------------
+    function tick() {
+      const raw = getSensorReadings(state.timeStep);
+      const current = applyScenario(raw);
+      const res = runPipeline(current, raw);
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      state.prevReading = current.slice();
+      state.history.push({
+        step: state.timeStep,
+        timeStr: nowStr,
+        obs: res.obs,
+        exp: res.exp,
+        res: res.res,
+        dk: res.dk,
+        status: res.status
+      });
+
+      if (state.history.length > 20) state.history.shift();
+
+      renderUI(res);
+      state.timeStep += 1;
+    }
+
+    document.getElementById("injectBtn").addEventListener("click", () => {
+      state.simMode = "critical";
+      tick();
+    });
+
+    document.getElementById("crackBtn").addEventListener("click", () => {
+      state.simMode = "crack";
+      state.crackProgress = 0.0;
+      tick();
+    });
+
+    document.getElementById("loadBtn").addEventListener("click", () => {
+      state.simMode = "load";
+      tick();
+    });
+
+    document.getElementById("stormBtn").addEventListener("click", () => {
+      state.simMode = "storm";
+      tick();
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      state.simMode = "normal";
+      state.crackProgress = 0.0;
+      state.timeStep = 0;
+      state.prevReading = [BASELINES.strain, BASELINES.vibration, BASELINES.tilt, BASELINES.temperature];
+      state.history = [];
+      state.alerts = [];
+      tick();
+    });
+
+    setInterval(tick, 1500);
+    tick();
+  </script>
+</body>
+</html>
